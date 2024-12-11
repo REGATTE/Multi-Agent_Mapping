@@ -1,5 +1,6 @@
 from omni.ui import Button, Frame, Alignment
 from omni.kit.window.filepicker import FilePickerDialog
+import os
 
 
 class FileManager:
@@ -23,13 +24,15 @@ class FileManager:
         Args:
             parent_ui: The parent UI container where the picker will be added.
         """
-        def on_click_fn(filename, path):
-            # Callback when a file is selected
-            if filename and filename.endswith(".usd"):
-                print(f"[FileManager] USD File selected: {filename}")
-                self.on_file_selected_callback([path])
-            else:
-                print("[FileManager] No valid USD file selected.")
+        def on_click_fn(full_path):
+            """
+            Callback for when a valid USD file is selected.
+
+            Args:
+                full_path (str): The full path of the selected USD file.
+            """
+            print(f"[FileManager] USD File selected: {full_path}")
+            self.on_file_selected_callback(full_path)
 
         # Add the picker button to the parent UI
         self._add_folder_picker_icon(
@@ -56,11 +59,32 @@ class FileManager:
             button_title: Title for the confirmation button.
         """
         def open_file_picker():
+            """
+            Opens the file picker dialog.
+            """
             def on_selected(filename, path):
-                on_click_fn(filename, path)
+                """
+                Handles the selection of a file and constructs the full file path.
+
+                Args:
+                    filename (str): Name of the selected file.
+                    path (str): Path to the selected directory.
+                """
+                # Combine directory path and filename to get the full path
+                full_path = os.path.join(path, filename)
+                print(f"[FileManager] Full selected path: {full_path}")  # Debugging
+
+                # Pass the full path to the callback function
+                if filename and filename.endswith(".usd"):
+                    on_click_fn(full_path)
+                else:
+                    print("[FileManager] No valid USD file selected.")
                 file_picker.hide()
 
             def on_canceled(a, b):
+                """
+                Handles the cancellation of the file picker.
+                """
                 print("[FileManager] File selection canceled.")
                 file_picker.hide()
 
@@ -73,13 +97,13 @@ class FileManager:
                 enable_versioning_pane=True,
             )
 
-        # Add the file picker button to the parent UI
+        # Create the file picker button
         with Frame(parent=parent_ui, tooltip=button_title):
             Button(
                 name="IconButton",
                 width=100,
                 height=25,
                 clicked_fn=open_file_picker,
-                text="Browse",  # Text for the button
+                text="Browse",
                 alignment=Alignment.LEFT_CENTER,
             )

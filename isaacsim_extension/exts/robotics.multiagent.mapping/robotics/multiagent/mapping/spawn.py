@@ -1,8 +1,7 @@
-import os
 from pxr import Gf
 from omni.isaac.core.utils.stage import add_reference_to_stage
 from omni.isaac.core.prims import XFormPrim
-
+import os
 
 class RobotSpawner:
     """
@@ -27,35 +26,36 @@ class RobotSpawner:
             robot_usd_path (str): Path to the robot USD file.
         """
         try:
-            # Validate USD file path
             if not os.path.exists(robot_usd_path):
                 self.message_label.text = "Robot USD path does not exist."
+                print(f"[RobotSpawner] Invalid USD file path: {robot_usd_path}")
                 return
 
             if num_robots <= 0:
                 self.message_label.text = "Please enter a positive number of robots."
+                print("[RobotSpawner] Invalid robot count.")
                 return
 
-            # Base position for spawning robots
             base_position = Gf.Vec3d(0, 0, 0)
 
-            # Spawn robots with unique names and positions
             for i in range(num_robots):
                 robot_name = f"robot_{i+1}"
                 robot_path = f"/World/{robot_name}"
-                position = base_position + Gf.Vec3d(i * 2.0, 0, 0)  # Adjust spacing between robots
+                position = base_position + Gf.Vec3d(i * 2.0, 0, 0)
 
                 # Add robot to the stage
                 add_reference_to_stage(robot_usd_path, robot_path)
+                print(f"[RobotSpawner] Added {robot_name} to stage.")
 
-                # Set the robot's position
+                # Set robot position
                 xform_prim = XFormPrim(prim_path=robot_path)
-                xform_prim.set_world_transform(translation=position)
-                print(f"Spawned {robot_name} at {position}")
+                if xform_prim:
+                    xform_prim.set_world_pose(position)
+                    print(f"[RobotSpawner] Positioned {robot_name} at {position}.")
+                else:
+                    print(f"[RobotSpawner] Failed to retrieve prim for {robot_name}.")
 
-            # Update the UI with success message
             self.message_label.text = f"Spawned {num_robots} robots successfully!"
         except Exception as e:
-            # Handle errors and display message in UI
-            print(f"Error spawning robots: {e}")
+            print(f"[RobotSpawner] Error spawning robots: {e}")
             self.message_label.text = "Failed to spawn robots. Check logs for details."

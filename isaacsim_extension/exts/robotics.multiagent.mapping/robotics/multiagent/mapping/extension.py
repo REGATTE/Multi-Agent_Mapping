@@ -1,7 +1,9 @@
+import os
 import omni.ext
 import omni.ui as ui
 from .spawn import RobotSpawner
 from .file_manager import FileManager
+
 
 class RoboticsMultiagentMappingExtension(omni.ext.IExt):
     """
@@ -12,11 +14,12 @@ class RoboticsMultiagentMappingExtension(omni.ext.IExt):
     def on_startup(self, ext_id):
         print("[robotics.multiagent.mapping] Extension startup")
 
-        # Initialize file manager
+        # Initialize file manager and robot spawner
         self.file_manager = FileManager(self.on_file_selected)
+        self.robot_spawner = None
 
         # Create UI window
-        self._window = ui.Window("Multi-Agent Robotic Mapping", width=400, height=200)
+        self._window = ui.Window("Multi-Agent Robotic Mapping", width=400, height=300)
         with self._window.frame:
             with ui.VStack(spacing=10):
                 self.setup_file_picker()  # Setup the file picker
@@ -27,26 +30,31 @@ class RoboticsMultiagentMappingExtension(omni.ext.IExt):
         Sets up the file picker UI components.
         """
         ui.Label("Robot USD File:", height=20)
-        with ui.HStack(height=30):
+        with ui.HStack(spacing=10):
             # Display for selected file path
             self._file_path_label = ui.Label("No file selected", height=20)
 
             # Add file picker button
             self.file_manager.add_file_picker(parent_ui=ui.HStack())
 
-    def on_file_selected(self, file_paths):
+    def on_file_selected(self, file_path):
         """
         Callback triggered when a file is selected.
 
         Args:
-            file_paths (list): List of selected file paths.
+            file_path (str): Full path of the selected file.
         """
-        if file_paths and len(file_paths) > 0:
-            self.selected_usd_path = file_paths[0]
+        print(f"[Extension] Raw file path: {file_path}")  # Debugging
+
+        # Validate the selected file
+        if os.path.isfile(file_path) and file_path.endswith(".usd"):
+            self.selected_usd_path = file_path
             self._file_path_label.text = f"Selected: {self.selected_usd_path}"
-            print(f"[Extension] File selected: {self.selected_usd_path}")
+            self.robot_spawner = RobotSpawner(self._file_path_label)
+            print(f"[Extension] Valid USD file selected: {self.selected_usd_path}")
         else:
-            print("[Extension] No file selected.")
+            self._file_path_label.text = "Error: Please select a valid .usd file."
+            print("[Extension] Invalid USD file selected.")
 
     def setup_robot_controls(self):
         """
@@ -68,7 +76,11 @@ class RoboticsMultiagentMappingExtension(omni.ext.IExt):
         """
         if not hasattr(self, "selected_usd_path"):
             print("[Extension] Please select a USD file before spawning.")
+            self._file_path_label.text = "Error: No USD file selected."
             return
 
         num_of_robots = self._robot_count_field.model.get_value_as_int()
-        print(f"Spawning {num_of_robots} robots using {self.selected_usd_path}")
+        if self.robot_spawner:
+            self.robot_spawner.spawn_robots(num_of_robots, self.selected_usd_path)
+        else:
+            print("[Extension] Robot spawner not initialized.")
