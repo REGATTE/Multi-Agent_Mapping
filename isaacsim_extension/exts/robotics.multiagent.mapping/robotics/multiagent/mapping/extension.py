@@ -2,6 +2,7 @@ import os
 import omni.ext
 import omni.ui as ui
 import omni.usd
+from omni.isaac.core.utils.stage import add_reference_to_stage
 from .spawn import RobotSpawner
 from .file_manager import FileManager
 
@@ -16,19 +17,20 @@ class RoboticsMultiagentMappingExtension(omni.ext.IExt):
         print("[robotics.multiagent.mapping] Extension startup")
 
         # Initialize file manager and robot spawner
-        self.file_manager = FileManager(self.on_file_selected)
+        self.file_manager = FileManager()
         self.robot_spawner = None
 
         # Create UI window
-        self._window = ui.Window("Multi-Agent Robotic Mapping", width=400, height=300)
+        self._window = ui.Window("Multi-Agent Robotic Mapping", width=400, height=400)
         with self._window.frame:
             with ui.VStack(spacing=0):  # Set vertical spacing to 0
-                self.setup_file_picker()  # Setup the file picker
+                self.setup_file_picker()  # Setup the robot file picker
+                self.setup_world_picker()  # Setup the world file picker
                 self.setup_robot_controls()  # Setup robot controls
 
     def setup_file_picker(self):
         """
-        Sets up the file picker UI components.
+        Sets up the file picker UI components for robot files.
         """
         ui.Label("Robot USD File:", height=20)
         with ui.HStack(spacing=10):
@@ -36,11 +38,31 @@ class RoboticsMultiagentMappingExtension(omni.ext.IExt):
             self._file_path_label = ui.Label("No file selected", height=20)
 
             # Add file picker button
-            self.file_manager.add_file_picker(parent_ui=ui.HStack())
+            self.file_manager.add_file_picker(
+                parent_ui=ui.HStack(),
+                dialog_title="Select Robot USD File",
+                on_file_selected_callback=self.on_file_selected,
+            )
+
+    def setup_world_picker(self):
+        """
+        Sets up the file picker UI components for world files.
+        """
+        ui.Label("World USD File:", height=20)
+        with ui.HStack(spacing=10):
+            # Display for selected world file path
+            self._world_file_path_label = ui.Label("No file selected", height=20)
+
+            # Add world file picker button
+            self.file_manager.add_file_picker(
+                parent_ui=ui.HStack(),
+                dialog_title="Select World USD File",
+                on_file_selected_callback=self.on_world_file_selected,
+            )
 
     def on_file_selected(self, file_path):
         """
-        Callback triggered when a file is selected.
+        Callback triggered when a robot file is selected.
 
         Args:
             file_path (str): Full path of the selected file.
@@ -57,9 +79,27 @@ class RoboticsMultiagentMappingExtension(omni.ext.IExt):
             self._file_path_label.text = "Error: Please select a valid .usd file."
             print("[Extension] Invalid USD file selected.")
 
+    def on_world_file_selected(self, file_path):
+        """
+        Callback triggered when a world file is selected.
+
+        Args:
+            file_path (str): Full path of the selected world file.
+        """
+        print(f"[Extension] Raw world file path: {file_path}")  # Debugging
+
+        # Validate the selected world file
+        if os.path.isfile(file_path) and file_path.endswith(".usd"):
+            self.selected_world_path = file_path
+            self._world_file_path_label.text = f"Selected: {self.selected_world_path}"
+            print(f"[Extension] Valid world USD file selected: {self.selected_world_path}")
+        else:
+            self._world_file_path_label.text = "Error: Please select a valid .usd file."
+            print("[Extension] Invalid world USD file selected.")
+
     def setup_robot_controls(self):
         """
-        Sets up the controls for entering robot count, spawning robots, and resetting the world.
+        Sets up the controls for entering robot count, spawning robots, resetting the world, and loading a world file.
         """
         # Number input field beside the text
         with ui.HStack(height=30, spacing=10):  # Adjust spacing between label and field
@@ -70,10 +110,10 @@ class RoboticsMultiagentMappingExtension(omni.ext.IExt):
         # Add buttons with proper spacing and fixed widths
         with ui.HStack(height=30, spacing=20):  # Adjust spacing between buttons
             ui.Button(
-                "Spawn Robots",
+                "Spawn Robots and World",
                 height=25,
-                width=150,  # Fixed width to prevent overlap
-                clicked_fn=self.spawn_robots
+                width=200,  # Fixed width to prevent overlap
+                clicked_fn=self.spawn_robots_and_world
             )
             ui.Button(
                 "Reset World",
@@ -82,42 +122,66 @@ class RoboticsMultiagentMappingExtension(omni.ext.IExt):
                 clicked_fn=self.reset_world
             )
 
-    def spawn_robots(self):
+    def spawn_robots_and_world(self):
         """
-        Spawns robots using the selected USD file.
+        Loads the world file under /World/<world_name> and spawns robots under /World.
         """
-        if not hasattr(self, "selected_usd_path"):
-            print("[Extension] Please select a USD file before spawning.")
-            self._file_path_label.text = "Error: No USD file selected."
+        if not hasattr(self, "selected_world_path"):
+            print("[Extension] Please select a world file before spawning.")
+            self._world_file_path_label.text = "Error: No world file selected."
             return
 
-        num_of_robots = self._robot_count_field.model.get_value_as_int()
-        if self.robot_spawner:
-            self.robot_spawner.spawn_robots(num_of_robots, self.selected_usd_path)
-        else:
-            print("[Extension] Robot spawner not initialized.")
+        if not hasattr(self, "selected_usd_path"):
+            print("[Extension] Please select a robot file before spawning.")
+            self._file_path_label.text = "Error: No robot file selected."
+            return
+
+        try:
+            # Load the world file
+            stage = omni.usd.get_context().get_stage()
+
+            # Ensure the /World prim exists
+            world_prim = stage.GetPrimAtPath("/World")
+            if not world_prim.IsValid():
+                world_prim = stage.DefinePrim("/World", "Xform")
+
+            # Use the world file name (without extension) as the parent prim
+            world_file_name = os.path.splitext(os.path.basename(self.selected_world_path))[0]
+            world_parent_path = f"/World/{world_file_name}"
+
+            # Add the world file under /World/<world_name>
+            add_reference_to_stage(self.selected_world_path, world_parent_path)
+            print(f"[Extension] World loaded successfully under {world_parent_path}.")
+
+            # Spawn robots under /World
+            num_of_robots = self._robot_count_field.model.get_value_as_int()
+            if self.robot_spawner:
+                self.robot_spawner.spawn_robots(num_of_robots, self.selected_usd_path)
+                print(f"[Extension] Spawned {num_of_robots} robots successfully.")
+            else:
+                print("[Extension] Robot spawner not initialized.")
+        except Exception as e:
+            print(f"[Extension] Error during spawn: {e}")
+            self._file_path_label.text = "Error during spawn."
 
     def reset_world(self):
         """
-        Resets the stage by removing all spawned robots and resetting the world.
+        Resets the stage by clearing the /World prim entirely.
         """
         try:
             print("[Extension] Resetting the world...")
 
-            # Iterate through and remove all robots under /World
+            # Clear the /World prim
             stage = omni.usd.get_context().get_stage()
             world = stage.GetPrimAtPath("/World")
-
             if world.IsValid():
-                for child in world.GetChildren():
-                    print(f"[Extension] Removing {child.GetPath()}")
-                    stage.RemovePrim(child.GetPath())
+                stage.RemovePrim("/World")
 
-            self._file_path_label.text = "World reset successfully."
+            self._world_file_path_label.text = "World reset successfully."
             print("[Extension] World reset complete.")
         except Exception as e:
             print(f"[Extension] Error resetting the world: {e}")
-            self._file_path_label.text = "Error resetting the world."
+            self._world_file_path_label.text = "Error resetting the world."
 
     def on_shutdown(self):
         print("[robotics.multiagent.mapping] Extension shutdown")
