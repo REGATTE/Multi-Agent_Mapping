@@ -99,26 +99,30 @@ class RoboticsMultiagentMappingExtension(omni.ext.IExt):
 
     def setup_robot_controls(self):
         """
-        Sets up the controls for entering robot count, spawning robots, resetting the world, and loading a world file.
+        Sets up the controls for spawning robots and resetting the world.
         """
-        # Number input field beside the text
-        with ui.HStack(height=30, spacing=10):  # Adjust spacing between label and field
+        with ui.HStack(height=30, spacing=10):
             ui.Label("Enter number of robots to spawn:", height=20)
             self._robot_count_field = ui.IntField(width=100, height=25)
             self._robot_count_field.model.set_value(1)
 
-        # Add buttons with proper spacing and fixed widths
-        with ui.HStack(height=30, spacing=20):  # Adjust spacing between buttons
+        with ui.HStack(height=30, spacing=20):
             ui.Button(
                 "Spawn Robots and World",
                 height=25,
-                width=200,  # Fixed width to prevent overlap
+                width=200,
                 clicked_fn=self.spawn_robots_and_world
+            )
+            ui.Button(
+                "Resent to spawn position",
+                height=25,
+                width=200,
+                checked_fn=self.reset_to_initial_positions
             )
             ui.Button(
                 "Reset World",
                 height=25,
-                width=150,  # Fixed width to prevent overlap
+                width=150,
                 clicked_fn=self.reset_world
             )
 
@@ -156,13 +160,30 @@ class RoboticsMultiagentMappingExtension(omni.ext.IExt):
             # Spawn robots under /World
             num_of_robots = self._robot_count_field.model.get_value_as_int()
             if self.robot_spawner:
-                self.robot_spawner.spawn_robots(num_of_robots, self.selected_usd_path)
+                self.robot_spawner.spawn_robots(num_of_robots, self.selected_usd_path, world_parent_path)
                 print(f"[Extension] Spawned {num_of_robots} robots successfully.")
             else:
                 print("[Extension] Robot spawner not initialized.")
         except Exception as e:
             print(f"[Extension] Error during spawn: {e}")
             self._file_path_label.text = "Error during spawn."
+    
+    def reset_to_initial_positions(self):
+        """
+        Resets all robots to their initial spawn positions.
+        Stops the simulation and resets the positions.
+        """
+        if not self.robot_spawner:
+            print("[Extension] Robot spawner not initialized.")
+            return
+
+        try:
+            print("[Extension] Stopping simulation and resetting to initial positions...")
+            omni.timeline.get_timeline_interface().stop()  # Stop the simulation
+            self.robot_spawner.reset_to_initial_positions()
+            print("[Extension] Robots reset to initial positions.")
+        except Exception as e:
+            print(f"[Extension] Error resetting to initial positions: {e}")
 
     def reset_world(self):
         """
