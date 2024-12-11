@@ -1,6 +1,7 @@
 import os
 import omni.ext
 import omni.ui as ui
+import omni.usd
 from .spawn import RobotSpawner
 from .file_manager import FileManager
 
@@ -21,7 +22,7 @@ class RoboticsMultiagentMappingExtension(omni.ext.IExt):
         # Create UI window
         self._window = ui.Window("Multi-Agent Robotic Mapping", width=400, height=300)
         with self._window.frame:
-            with ui.VStack(spacing=10):
+            with ui.VStack(spacing=0):  # Set vertical spacing to 0
                 self.setup_file_picker()  # Setup the file picker
                 self.setup_robot_controls()  # Setup robot controls
 
@@ -58,17 +59,28 @@ class RoboticsMultiagentMappingExtension(omni.ext.IExt):
 
     def setup_robot_controls(self):
         """
-        Sets up the controls for entering robot count and spawning.
+        Sets up the controls for entering robot count, spawning robots, and resetting the world.
         """
-        ui.Label("Enter number of robots to spawn:", height=20)
-        self._robot_count_field = ui.IntField(width=200, height=25)
-        self._robot_count_field.model.set_value(1)
+        # Number input field beside the text
+        with ui.HStack(height=30, spacing=10):  # Adjust spacing between label and field
+            ui.Label("Enter number of robots to spawn:", height=20)
+            self._robot_count_field = ui.IntField(width=100, height=25)
+            self._robot_count_field.model.set_value(1)
 
-        ui.Button(
-            "Spawn Robots",
-            height=30,
-            clicked_fn=self.spawn_robots
-        )
+        # Add buttons with proper spacing and fixed widths
+        with ui.HStack(height=30, spacing=20):  # Adjust spacing between buttons
+            ui.Button(
+                "Spawn Robots",
+                height=25,
+                width=150,  # Fixed width to prevent overlap
+                clicked_fn=self.spawn_robots
+            )
+            ui.Button(
+                "Reset World",
+                height=25,
+                width=150,  # Fixed width to prevent overlap
+                clicked_fn=self.reset_world
+            )
 
     def spawn_robots(self):
         """
@@ -84,3 +96,28 @@ class RoboticsMultiagentMappingExtension(omni.ext.IExt):
             self.robot_spawner.spawn_robots(num_of_robots, self.selected_usd_path)
         else:
             print("[Extension] Robot spawner not initialized.")
+
+    def reset_world(self):
+        """
+        Resets the stage by removing all spawned robots and resetting the world.
+        """
+        try:
+            print("[Extension] Resetting the world...")
+
+            # Iterate through and remove all robots under /World
+            stage = omni.usd.get_context().get_stage()
+            world = stage.GetPrimAtPath("/World")
+
+            if world.IsValid():
+                for child in world.GetChildren():
+                    print(f"[Extension] Removing {child.GetPath()}")
+                    stage.RemovePrim(child.GetPath())
+
+            self._file_path_label.text = "World reset successfully."
+            print("[Extension] World reset complete.")
+        except Exception as e:
+            print(f"[Extension] Error resetting the world: {e}")
+            self._file_path_label.text = "Error resetting the world."
+
+    def on_shutdown(self):
+        print("[robotics.multiagent.mapping] Extension shutdown")
