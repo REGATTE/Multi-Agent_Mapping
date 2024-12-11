@@ -21,7 +21,7 @@ class RoboticsMultiagentMappingExtension(omni.ext.IExt):
         self.robot_spawner = None
 
         # Create UI window
-        self._window = ui.Window("Multi-Agent Robotic Mapping", width=400, height=400)
+        self._window = ui.Window("Multi-Agent Robotic Mapping", width=500, height=150, flags=ui.WINDOW_FLAGS_NO_RESIZE)
         with self._window.frame:
             with ui.VStack(spacing=0):  # Set vertical spacing to 0
                 self.setup_file_picker()  # Setup the robot file picker
@@ -32,14 +32,12 @@ class RoboticsMultiagentMappingExtension(omni.ext.IExt):
         """
         Sets up the file picker UI components for robot files.
         """
-        ui.Label("Robot USD File:", height=20)
-        with ui.HStack(spacing=10):
-            # Display for selected file path
-            self._file_path_label = ui.Label("No file selected", height=20)
-
-            # Add file picker button
+        with ui.HStack():
+            ui.Label("Robot USD File:", height=20, width=150)  # Static width for label
+            self._file_path_label = ui.Label("No file selected", height=20, width=150)
+            ui.Spacer()  # Pushes the browse button to the right
             self.file_manager.add_file_picker(
-                parent_ui=ui.HStack(),
+                parent_ui=ui.HStack(),  # Correct usage
                 dialog_title="Select Robot USD File",
                 on_file_selected_callback=self.on_file_selected,
             )
@@ -48,14 +46,12 @@ class RoboticsMultiagentMappingExtension(omni.ext.IExt):
         """
         Sets up the file picker UI components for world files.
         """
-        ui.Label("World USD File:", height=20)
-        with ui.HStack(spacing=10):
-            # Display for selected world file path
-            self._world_file_path_label = ui.Label("No file selected", height=20)
-
-            # Add world file picker button
+        with ui.HStack():
+            ui.Label("World USD File:", height=20, width=150)  # Static width for label
+            self._world_file_path_label = ui.Label("No file selected", height=20, width=150)
+            ui.Spacer()  # Pushes the browse button to the right
             self.file_manager.add_file_picker(
-                parent_ui=ui.HStack(),
+                parent_ui=ui.HStack(),  # Correct usage
                 dialog_title="Select World USD File",
                 on_file_selected_callback=self.on_world_file_selected,
             )
@@ -68,11 +64,13 @@ class RoboticsMultiagentMappingExtension(omni.ext.IExt):
             file_path (str): Full path of the selected file.
         """
         print(f"[Extension] Raw file path: {file_path}")  # Debugging
+        # Extract the file name from the path
+        file_name = os.path.basename(file_path)
 
         # Validate the selected file
         if os.path.isfile(file_path) and file_path.endswith(".usd"):
             self.selected_usd_path = file_path
-            self._file_path_label.text = f"Selected: {self.selected_usd_path}"
+            self._file_path_label.text = f"Selected: {file_name}"
             self.robot_spawner = RobotSpawner(self._file_path_label)
             print(f"[Extension] Valid USD file selected: {self.selected_usd_path}")
         else:
@@ -88,10 +86,13 @@ class RoboticsMultiagentMappingExtension(omni.ext.IExt):
         """
         print(f"[Extension] Raw world file path: {file_path}")  # Debugging
 
+        # Extract the file name from the path
+        file_name = os.path.basename(file_path)
+
         # Validate the selected world file
         if os.path.isfile(file_path) and file_path.endswith(".usd"):
             self.selected_world_path = file_path
-            self._world_file_path_label.text = f"Selected: {self.selected_world_path}"
+            self._world_file_path_label.text = f"Selected: {file_name}"
             print(f"[Extension] Valid world USD file selected: {self.selected_world_path}")
         else:
             self._world_file_path_label.text = "Error: Please select a valid .usd file."
@@ -101,23 +102,23 @@ class RoboticsMultiagentMappingExtension(omni.ext.IExt):
         """
         Sets up the controls for spawning robots and resetting the world.
         """
-        with ui.HStack(height=30, spacing=10):
-            ui.Label("Enter number of robots to spawn:", height=20)
+        with ui.HStack(height=30, spacing=5):  # Adjusted horizontal spacing
+            ui.Label("Enter number of robots to spawn:", height=20, width=0)
             self._robot_count_field = ui.IntField(width=100, height=25)
-            self._robot_count_field.model.set_value(1)
 
-        with ui.HStack(height=30, spacing=20):
+        with ui.HStack(height=30, spacing=10):  # Standardized button spacing
+            ui.Spacer()
             ui.Button(
                 "Spawn Robots and World",
                 height=25,
-                width=200,
+                width=150,
                 clicked_fn=self.spawn_robots_and_world
             )
             ui.Button(
-                "Resent to spawn position",
+                "Reset to Spawn Position",
                 height=25,
-                width=200,
-                checked_fn=self.reset_to_initial_positions
+                width=150,
+                clicked_fn=self.reset_to_initial_positions
             )
             ui.Button(
                 "Reset World",
@@ -125,6 +126,7 @@ class RoboticsMultiagentMappingExtension(omni.ext.IExt):
                 width=150,
                 clicked_fn=self.reset_world
             )
+            ui.Spacer()
 
     def spawn_robots_and_world(self):
         """
