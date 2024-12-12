@@ -67,7 +67,7 @@ class RoboticsMultiagentMappingExtension(omni.ext.IExt):
         self.robot_file_paths.append(None)
 
         with self.robot_ui_container:
-            row = ui.HStack(spacing=2, height=30)  # Explicit row height and compact spacing
+            row = ui.HStack(spacing=5, height=30)  # Explicit row height and compact spacing
             with row:
                 ui.Label(f"Robot {robot_index} USD File:", width=200, height=20)
                 robot_label = ui.Label("No file selected", width=150, height=20)
@@ -94,15 +94,18 @@ class RoboticsMultiagentMappingExtension(omni.ext.IExt):
         if self.plus_button:
             self.plus_button.visible = False
             self.plus_button.destroy()
+            self.plus_button = None
 
-        with self.robot_ui_container:
-            self.plus_button = ui.Button(
-                "+",
-                width=30,
-                height=30,
-                clicked_fn=self.add_robot_row,
-                tooltip="Add another robot",
-            )
+        # Only add the '+' button if the number of robots is less than the maximum
+        if len(self.robot_file_paths) < self.max_robots:
+            with self.robot_ui_container:
+                self.plus_button = ui.Button(
+                    "+",
+                    width=30,
+                    height=30,
+                    clicked_fn=self.add_robot_row,
+                    tooltip="Add another robot",
+                )
 
     def remove_robot_row(self, index):
         if len(self.robot_file_paths) <= 1:
