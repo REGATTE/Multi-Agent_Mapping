@@ -173,7 +173,7 @@ class RoboticsMultiagentMappingExtension(omni.ext.IExt):
                 clicked_fn=self.reset_robots_to_initial_positions,
             )
             ui.Button(
-                "Reset World",
+                "Reset",
                 clicked_fn=self.reset,
             )
 
