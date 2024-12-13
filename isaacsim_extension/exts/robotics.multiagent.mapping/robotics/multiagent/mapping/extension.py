@@ -174,7 +174,7 @@ class RoboticsMultiagentMappingExtension(omni.ext.IExt):
             )
             ui.Button(
                 "Reset World",
-                clicked_fn=self.reset_world,
+                clicked_fn=self.reset,
             )
 
     def spawn_robots_and_world(self):
@@ -205,30 +205,45 @@ class RoboticsMultiagentMappingExtension(omni.ext.IExt):
         else:
             print("[Extension] No robots to reset.")
 
-    def reset_world(self):
+    def reset(self):
         try:
+            # Reset the USD world by removing the /World prim
             stage = omni.usd.get_context().get_stage()
-            stage.RemovePrim("/World")
-            print("[Extension] World reset.")
+            if stage.GetPrimAtPath("/World"):
+                stage.RemovePrim("/World")
+                print("[Extension] World reset.")
+            else:
+                print("[Extension] No world prim found. Skipping world reset.")
 
-            # Reset world file selection
+            # Reset the world file selection
             self.selected_world_path = None
             self._world_file_path_label.text = "No file selected"
 
-            # Clear all robots rows and file paths
-            for row in self.robot_rows:
-                row.visible = False
-                row.destroy()
-            self.robot_rows.clear()
+            # Destroy all robot rows in the UI
+            if self.robot_rows:
+                print(f"[Extension] Clearing {len(self.robot_rows)} robot rows from the UI.")
+                for row, label in self.robot_rows:
+                    if row:
+                        row.destroy()
+                        print(f"[Extension] Removed {label.text} from the list.")
+                self.robot_rows.clear()  # Clear the list of rows
+
+            # Reset the robot file paths
             self.robot_file_paths.clear()
+            print("[Extension] Robot file paths cleared.")
 
-            # Reset to a single robot row
-            self.robot_file_paths = [None]
-            self.add_robot_row()
+            # Add a single default robot row
+            self.robot_ui_container.clear()  # Clear all UI children
+            self.robot_file_paths = [None]  # Reset to a single default file path
+            self.add_robot_row()  # Add the initial robot row to the list
 
-            print("[Extension] Reset complete. Only Robot 1 remains.")
+            # Update the '+' button visibility
+            self.update_plus_button_position()
+
+            print("[Extension] Reset complete. World reset and robot list cleared.")
         except Exception as e:
-            print(f"[Extension] Error resetting world: {e}")
+            print(f"[Extension] Error during reset: {e}")
+
     
     def clear_invisible_elements(self):
         """Clears any hidden or empty elements occupying space."""
