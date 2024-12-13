@@ -192,7 +192,7 @@ class RoboticsMultiagentMappingExtension(omni.ext.IExt):
             world_prim_path = "/World/Environment"
             add_reference_to_stage(self.selected_world_path, world_prim_path)
             self.robot_spawner = RobotSpawner(stage)
-            self.robot_spawner.spawn_robots(len(valid_robot_paths), valid_robot_paths[0], world_prim_path)
+            self.robot_spawner.spawn_robots(valid_robot_paths, world_prim_path)
 
             print(f"[Extension] Spawned {len(valid_robot_paths)} robots successfully.")
         except Exception as e:
