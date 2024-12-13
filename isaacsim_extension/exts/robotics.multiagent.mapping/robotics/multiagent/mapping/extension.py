@@ -97,9 +97,9 @@ class RoboticsMultiagentMappingExtension(omni.ext.IExt):
             self.plus_button.visible = False
             self.plus_button.destroy()
             self.plus_button = None
-
-        # Only add the '+' button if the number of robots is less than the maximum
-        if len(self.robot_file_paths) < self.max_robots:
+        """Updates the visibility of the '+' button based on the number of robots."""
+        # If the '+' button doesn't exist yet, create it
+        if not self.plus_button:
             with self.robot_ui_container:
                 self.plus_button = ui.Button(
                     "+",
@@ -108,6 +108,9 @@ class RoboticsMultiagentMappingExtension(omni.ext.IExt):
                     clicked_fn=self.add_robot_row,
                     tooltip="Add another robot",
                 )
+
+        # Toggle the visibility of the '+' button
+        self.plus_button.visible = len(self.robot_rows) < self.max_robots
 
     def remove_robot_row(self, index):
         """Removes a robot row, clears its space, and reorders the remaining rows."""
