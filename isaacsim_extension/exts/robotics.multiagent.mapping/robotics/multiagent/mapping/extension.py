@@ -6,6 +6,8 @@ from omni.isaac.core.utils.stage import add_reference_to_stage
 from .spawn import RobotSpawner
 from .file_manager import FileManager
 
+import threading
+
 
 class RoboticsMultiagentMappingExtension(omni.ext.IExt):
     def on_startup(self, ext_id):
@@ -57,8 +59,8 @@ class RoboticsMultiagentMappingExtension(omni.ext.IExt):
                 self.add_robot_row()
 
     def add_robot_row(self):
-        """Adds a new robot row."""
-        robot_index = len(self.robot_rows) + 1
+        """Adds a new robot row with correct numbering."""
+        robot_index = len(self.robot_rows) + 1  # The new index for the robot
 
         if len(self.robot_file_paths) >= self.max_robots:
             print("[Extension] Maximum robot limit reached.")
@@ -67,9 +69,9 @@ class RoboticsMultiagentMappingExtension(omni.ext.IExt):
         self.robot_file_paths.append(None)
 
         with self.robot_ui_container:
-            row = ui.HStack(spacing=5, height=30)  # Explicit row height and compact spacing
+            row = ui.HStack(spacing=5, height=30)  # Compact spacing and height
             with row:
-                ui.Label(f"Robot {robot_index} USD File:", width=200, height=20)
+                label = ui.Label(f"Robot {robot_index} USD File:", width=200, height=20)  # Store reference
                 robot_label = ui.Label("No file selected", width=150, height=20)
                 self.file_manager.add_file_picker(
                     parent_ui=ui.HStack(),
@@ -85,7 +87,7 @@ class RoboticsMultiagentMappingExtension(omni.ext.IExt):
                     clicked_fn=lambda index=robot_index - 1: self.remove_robot_row(index),
                     tooltip="Remove this robot",
                 )
-            self.robot_rows.append(row)
+            self.robot_rows.append((row, label))  # Store both row and label as a tuple
 
         self.update_plus_button_position()
 
@@ -108,21 +110,36 @@ class RoboticsMultiagentMappingExtension(omni.ext.IExt):
                 )
 
     def remove_robot_row(self, index):
+        """Removes a robot row, clears its space, and reorders the remaining rows."""
         if len(self.robot_file_paths) <= 1:
             print("[Extension] At least one robot must remain.")
             return
 
-        self.robot_rows[index].visible = False
-        self.robot_rows[index].destroy()
+        # Store the row to be removed
+        row_to_remove, _ = self.robot_rows[index]
+
+        # Schedule the destruction of the row after a slight delay
+        def destroy_row():
+            row_to_remove.destroy()
+
+        threading.Timer(0.01, destroy_row).start()
+
+        # Remove the row and file path from the internal lists
         del self.robot_rows[index]
         del self.robot_file_paths[index]
+
+        # Reorder the remaining robot labels
         self.reorder_robot_labels()
+
+        # Update the '+' button position
         self.update_plus_button_position()
 
+
     def reorder_robot_labels(self):
-        for i, row in enumerate(self.robot_rows):
-            label = row.get_children()[0]
+        """Reorders the labels of all robot rows."""
+        for i, (_, label) in enumerate(self.robot_rows):  # Access stored label reference
             label.text = f"Robot {i + 1} USD File:"
+
 
     def on_robot_file_selected(self, file_path, robot_index, robot_label):
         if os.path.isfile(file_path) and file_path.endswith(".usd"):
