@@ -6,205 +6,250 @@ from omni.isaac.core.utils.stage import add_reference_to_stage
 from .spawn import RobotSpawner
 from .file_manager import FileManager
 
+import threading
+
 
 class RoboticsMultiagentMappingExtension(omni.ext.IExt):
-    """
-    Main class for the Multi-Agent Robotic Mapping extension.
-    Manages the UI and file selection logic.
-    """
-
     def on_startup(self, ext_id):
         print("[robotics.multiagent.mapping] Extension startup")
-
-        # Initialize file manager and robot spawner
         self.file_manager = FileManager()
         self.robot_spawner = None
+        self.robot_file_paths = []
+        self.robot_rows = []  # List to track robot rows
+        self.max_robots = 10
+
+        # Initialize the '+' button
+        self.plus_button = None
 
         # Create UI window
-        self._window = ui.Window("Multi-Agent Robotic Mapping", width=500, height=150, flags=ui.WINDOW_FLAGS_NO_RESIZE)
+        self._window = ui.Window(
+            "Multi-Agent Robotic Mapping", width=550, height=270, flags=ui.WINDOW_FLAGS_NO_RESIZE
+        )  # Non-resizable window
         with self._window.frame:
-            with ui.VStack(spacing=0):  # Set vertical spacing to 0
-                self.setup_file_picker()  # Setup the robot file picker
-                self.setup_world_picker()  # Setup the world file picker
-                self.setup_robot_controls()  # Setup robot controls
-
-    def setup_file_picker(self):
-        """
-        Sets up the file picker UI components for robot files.
-        """
-        with ui.HStack():
-            ui.Label("Robot USD File:", height=20, width=150)  # Static width for label
-            self._file_path_label = ui.Label("No file selected", height=20, width=150)
-            ui.Spacer()  # Pushes the browse button to the right
-            self.file_manager.add_file_picker(
-                parent_ui=ui.HStack(),  # Correct usage
-                dialog_title="Select Robot USD File",
-                on_file_selected_callback=self.on_file_selected,
-            )
+            with ui.VStack(spacing=2):  # Minimal spacing between sections
+                self.setup_world_picker()
+                self.setup_robot_selection()
+                self.setup_controls()
 
     def setup_world_picker(self):
-        """
-        Sets up the file picker UI components for world files.
-        """
-        with ui.HStack():
-            ui.Label("World USD File:", height=20, width=150)  # Static width for label
-            self._world_file_path_label = ui.Label("No file selected", height=20, width=150)
-            ui.Spacer()  # Pushes the browse button to the right
-            self.file_manager.add_file_picker(
-                parent_ui=ui.HStack(),  # Correct usage
-                dialog_title="Select World USD File",
-                on_file_selected_callback=self.on_world_file_selected,
-            )
+        """Sets up the file picker for the world file."""
+        with ui.Frame(
+            style={"background_color": ui.color(0.2, 0.2, 0.2, 0.9)},  # Slightly dark background
+            padding=5,
+            height=40,  # Compact height
+        ):
+            with ui.HStack(spacing=5):  # Compact horizontal layout
+                ui.Label("World USD File:", width=200, height=20)
+                self._world_file_path_label = ui.Label("No file selected", width=150, height=20)
+                self.file_manager.add_file_picker(
+                    parent_ui=ui.HStack(),
+                    dialog_title="Select World USD File",
+                    on_file_selected_callback=self.on_world_file_selected,
+                )
 
-    def on_file_selected(self, file_path):
-        """
-        Callback triggered when a robot file is selected.
+    def setup_robot_selection(self):
+        """Sets up the scrollable UI for robot selection."""
+        with ui.Frame(
+            style={"background_color": ui.color(0.1, 0.1, 0.1, 0.9)},
+            padding=2,  # Reduce internal padding
+            margin=2,  # Minimize external margin
+        ):
+            with ui.ScrollingFrame(height=150):  # Fixed height for scrollable frame
+                self.robot_ui_container = ui.VStack(spacing=2)  # Minimal spacing between robot rows
+                self.add_robot_row()
 
-        Args:
-            file_path (str): Full path of the selected file.
-        """
-        print(f"[Extension] Raw file path: {file_path}")  # Debugging
-        # Extract the file name from the path
-        file_name = os.path.basename(file_path)
+    def add_robot_row(self):
+        """Adds a new robot row with correct numbering."""
+        robot_index = len(self.robot_rows) + 1  # The new index for the robot
 
-        # Validate the selected file
+        if len(self.robot_file_paths) >= self.max_robots:
+            print("[Extension] Maximum robot limit reached.")
+            return
+
+        self.robot_file_paths.append(None)
+
+        with self.robot_ui_container:
+            row = ui.HStack(spacing=5, height=30)  # Compact spacing and height
+            with row:
+                label = ui.Label(f"Robot {robot_index} USD File:", width=200, height=20)  # Store reference
+                robot_label = ui.Label("No file selected", width=150, height=20)
+                self.file_manager.add_file_picker(
+                    parent_ui=ui.HStack(),
+                    dialog_title=f"Select Robot {robot_index} USD File",
+                    on_file_selected_callback=lambda path, index=robot_index: self.on_robot_file_selected(
+                        path, index, robot_label
+                    ),
+                )
+                ui.Button(
+                    "-",
+                    width=30,
+                    height=30,
+                    clicked_fn=lambda index=robot_index - 1: self.remove_robot_row(index),
+                    tooltip="Remove this robot",
+                )
+            self.robot_rows.append((row, label))  # Store both row and label as a tuple
+
+        self.update_plus_button_position()
+
+    def update_plus_button_position(self):
+        """Repositions the '+' button."""
+        if self.plus_button:
+            self.plus_button.visible = False
+            self.plus_button.destroy()
+            self.plus_button = None
+        """Updates the visibility of the '+' button based on the number of robots."""
+        # If the '+' button doesn't exist yet, create it
+        if not self.plus_button:
+            with self.robot_ui_container:
+                self.plus_button = ui.Button(
+                    "+",
+                    width=30,
+                    height=30,
+                    clicked_fn=self.add_robot_row,
+                    tooltip="Add another robot",
+                )
+
+        # Toggle the visibility of the '+' button
+        self.plus_button.visible = len(self.robot_rows) < self.max_robots
+
+    def remove_robot_row(self, index):
+        """Removes a robot row, clears its space, and reorders the remaining rows."""
+        if len(self.robot_file_paths) <= 1:
+            print("[Extension] At least one robot must remain.")
+            return
+
+        # Store the row to be removed
+        row_to_remove, _ = self.robot_rows[index]
+
+        # Schedule the destruction of the row after a slight delay
+        def destroy_row():
+            row_to_remove.destroy()
+
+        threading.Timer(0.01, destroy_row).start()
+
+        # Remove the row and file path from the internal lists
+        del self.robot_rows[index]
+        del self.robot_file_paths[index]
+
+        # Reorder the remaining robot labels
+        self.reorder_robot_labels()
+
+        # Update the '+' button position
+        self.update_plus_button_position()
+
+
+    def reorder_robot_labels(self):
+        """Reorders the labels of all robot rows."""
+        for i, (_, label) in enumerate(self.robot_rows):  # Access stored label reference
+            label.text = f"Robot {i + 1} USD File:"
+
+
+    def on_robot_file_selected(self, file_path, robot_index, robot_label):
         if os.path.isfile(file_path) and file_path.endswith(".usd"):
-            self.selected_usd_path = file_path
-            self._file_path_label.text = f"Selected: {file_name}"
-            self.robot_spawner = RobotSpawner(self._file_path_label)
-            print(f"[Extension] Valid USD file selected: {self.selected_usd_path}")
+            file_name = os.path.basename(file_path)
+            self.robot_file_paths[robot_index - 1] = file_path
+            robot_label.text = file_name
+            print(f"[Extension] Selected Robot {robot_index}: {file_path}")
         else:
-            self._file_path_label.text = "Error: Please select a valid .usd file."
-            print("[Extension] Invalid USD file selected.")
+            print(f"[Extension] Invalid file selected for Robot {robot_index}.")
 
     def on_world_file_selected(self, file_path):
-        """
-        Callback triggered when a world file is selected.
-
-        Args:
-            file_path (str): Full path of the selected world file.
-        """
-        print(f"[Extension] Raw world file path: {file_path}")  # Debugging
-
-        # Extract the file name from the path
-        file_name = os.path.basename(file_path)
-
-        # Validate the selected world file
         if os.path.isfile(file_path) and file_path.endswith(".usd"):
+            file_name = os.path.basename(file_path)
             self.selected_world_path = file_path
             self._world_file_path_label.text = f"Selected: {file_name}"
-            print(f"[Extension] Valid world USD file selected: {self.selected_world_path}")
+            print(f"[Extension] World file selected: {file_path}")
         else:
-            self._world_file_path_label.text = "Error: Please select a valid .usd file."
-            print("[Extension] Invalid world USD file selected.")
+            print("[Extension] Invalid world file selected.")
 
-    def setup_robot_controls(self):
-        """
-        Sets up the controls for spawning robots and resetting the world.
-        """
-        with ui.HStack(height=30, spacing=5):  # Adjusted horizontal spacing
-            ui.Label("Enter number of robots to spawn:", height=20, width=0)
-            self._robot_count_field = ui.IntField(width=100, height=25)
-
-        with ui.HStack(height=30, spacing=10):  # Standardized button spacing
-            ui.Spacer()
+    def setup_controls(self):
+        with ui.HStack(spacing=10, height=40):
             ui.Button(
                 "Spawn Robots and World",
-                height=25,
-                width=150,
-                clicked_fn=self.spawn_robots_and_world
+                clicked_fn=self.spawn_robots_and_world,
             )
             ui.Button(
-                "Reset to Spawn Position",
-                height=25,
-                width=150,
-                clicked_fn=self.reset_to_initial_positions
+                "Reset Robots",
+                clicked_fn=self.reset_robots_to_initial_positions,
             )
             ui.Button(
-                "Reset World",
-                height=25,
-                width=150,
-                clicked_fn=self.reset_world
+                "Reset",
+                clicked_fn=self.reset,
             )
-            ui.Spacer()
 
     def spawn_robots_and_world(self):
-        """
-        Loads the world file under /World/<world_name> and spawns robots under /World.
-        """
         if not hasattr(self, "selected_world_path"):
-            print("[Extension] Please select a world file before spawning.")
-            self._world_file_path_label.text = "Error: No world file selected."
+            print("[Extension] No world file selected.")
             return
 
-        if not hasattr(self, "selected_usd_path"):
-            print("[Extension] Please select a robot file before spawning.")
-            self._file_path_label.text = "Error: No robot file selected."
+        valid_robot_paths = [path for path in self.robot_file_paths if path]
+        if not valid_robot_paths:
+            print("[Extension] No robot files selected.")
             return
 
         try:
-            # Load the world file
             stage = omni.usd.get_context().get_stage()
+            world_prim_path = "/World/Environment"
+            add_reference_to_stage(self.selected_world_path, world_prim_path)
+            self.robot_spawner = RobotSpawner(stage)
+            self.robot_spawner.spawn_robots(len(valid_robot_paths), valid_robot_paths[0], world_prim_path)
 
-            # Ensure the /World prim exists
-            world_prim = stage.GetPrimAtPath("/World")
-            if not world_prim.IsValid():
-                world_prim = stage.DefinePrim("/World", "Xform")
-
-            # Use the world file name (without extension) as the parent prim
-            world_file_name = os.path.splitext(os.path.basename(self.selected_world_path))[0]
-            world_parent_path = f"/World/{world_file_name}"
-
-            # Add the world file under /World/<world_name>
-            add_reference_to_stage(self.selected_world_path, world_parent_path)
-            print(f"[Extension] World loaded successfully under {world_parent_path}.")
-
-            # Spawn robots under /World
-            num_of_robots = self._robot_count_field.model.get_value_as_int()
-            if self.robot_spawner:
-                self.robot_spawner.spawn_robots(num_of_robots, self.selected_usd_path, world_parent_path)
-                print(f"[Extension] Spawned {num_of_robots} robots successfully.")
-            else:
-                print("[Extension] Robot spawner not initialized.")
+            print(f"[Extension] Spawned {len(valid_robot_paths)} robots successfully.")
         except Exception as e:
-            print(f"[Extension] Error during spawn: {e}")
-            self._file_path_label.text = "Error during spawn."
-    
-    def reset_to_initial_positions(self):
-        """
-        Resets all robots to their initial spawn positions.
-        Stops the simulation and resets the positions.
-        """
-        if not self.robot_spawner:
-            print("[Extension] Robot spawner not initialized.")
-            return
+            print(f"[Extension] Error during spawning: {e}")
 
-        try:
-            print("[Extension] Stopping simulation and resetting to initial positions...")
-            omni.timeline.get_timeline_interface().stop()  # Stop the simulation
+    def reset_robots_to_initial_positions(self):
+        if self.robot_spawner:
             self.robot_spawner.reset_to_initial_positions()
             print("[Extension] Robots reset to initial positions.")
-        except Exception as e:
-            print(f"[Extension] Error resetting to initial positions: {e}")
+        else:
+            print("[Extension] No robots to reset.")
 
-    def reset_world(self):
-        """
-        Resets the stage by clearing the /World prim entirely.
-        """
+    def reset(self):
         try:
-            print("[Extension] Resetting the world...")
-
-            # Clear the /World prim
+            # Reset the USD world by removing the /World prim
             stage = omni.usd.get_context().get_stage()
-            world = stage.GetPrimAtPath("/World")
-            if world.IsValid():
+            if stage.GetPrimAtPath("/World"):
                 stage.RemovePrim("/World")
+                print("[Extension] World reset.")
+            else:
+                print("[Extension] No world prim found. Skipping world reset.")
 
-            self._world_file_path_label.text = "World reset successfully."
-            print("[Extension] World reset complete.")
+            # Reset the world file selection
+            self.selected_world_path = None
+            self._world_file_path_label.text = "No file selected"
+
+            # Destroy all robot rows in the UI
+            if self.robot_rows:
+                print(f"[Extension] Clearing {len(self.robot_rows)} robot rows from the UI.")
+                for row, label in self.robot_rows:
+                    if row:
+                        row.destroy()
+                        print(f"[Extension] Removed {label.text} from the list.")
+                self.robot_rows.clear()  # Clear the list of rows
+
+            # Reset the robot file paths
+            self.robot_file_paths.clear()
+            print("[Extension] Robot file paths cleared.")
+
+            # Add a single default robot row
+            self.robot_ui_container.clear()  # Clear all UI children
+            self.robot_file_paths = [None]  # Reset to a single default file path
+            self.add_robot_row()  # Add the initial robot row to the list
+
+            # Update the '+' button visibility
+            self.update_plus_button_position()
+
+            print("[Extension] Reset complete. World reset and robot list cleared.")
         except Exception as e:
-            print(f"[Extension] Error resetting the world: {e}")
-            self._world_file_path_label.text = "Error resetting the world."
+            print(f"[Extension] Error during reset: {e}")
+
+    
+    def clear_invisible_elements(self):
+        """Clears any hidden or empty elements occupying space."""
+        for child in self.robot_ui_container.get_children():
+            if not child.visible:
+                child.destroy()
 
     def on_shutdown(self):
         print("[robotics.multiagent.mapping] Extension shutdown")
