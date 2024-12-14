@@ -1,0 +1,2 @@
+ros-humble-robot-localization
+ros-humble-foxglove-bridge
