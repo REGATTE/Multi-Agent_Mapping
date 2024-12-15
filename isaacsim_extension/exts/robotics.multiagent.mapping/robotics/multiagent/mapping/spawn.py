@@ -30,17 +30,12 @@ class RobotSpawner:
         Spawns robots randomly within the bounds of the world map, ensuring equal spacing.
 
         Args:
-            num_robots (int): Number of robots to spawn.
-            robot_usd_path (str): Path to the robot USD file.
+            robot_usd_paths (list): List of paths to the robot USD files.
             world_prim_path (str): Path to the world prim.
         """
         try:
-            if not os.path.exists(robot_usd_path):
-                print(f"[RobotSpawner] Invalid USD file path: {robot_usd_path}")
-                return
-
-            if num_robots <= 0:
-                print("[RobotSpawner] Invalid robot count.")
+            if len(robot_usd_paths) == 0:
+                print("[RobotSpawner] No robot USD paths provided.")
                 return
 
             stage = omni.usd.get_context().get_stage()
@@ -62,7 +57,7 @@ class RobotSpawner:
             positions = []
             spacing = 2.0  # Minimum spacing between robots
 
-            for _ in range(num_robots):
+            for _ in range(len(robot_usd_paths)):
                 while True:
                     x = random.uniform(bounds_min[0], bounds_max[0])
                     y = random.uniform(bounds_min[1], bounds_max[1])
@@ -80,6 +75,7 @@ class RobotSpawner:
 
                 add_reference_to_stage(robot_usd_path, robot_path)
 
+
                 xform_prim = stage.GetPrimAtPath(robot_path)
                 if xform_prim.IsValid():
                     xform_prim.GetAttribute("xformOp:translate").Set(position)
@@ -93,10 +89,10 @@ class RobotSpawner:
             # save positions to json file
             self.save_initial_positions_to_json()
 
-            print(f"[RobotSpawner] Spawned {num_robots} robots randomly!")
+            print(f"[RobotSpawner] Spawned {len(robot_usd_paths)} robots randomly!")
         except Exception as e:
             print(f"[RobotSpawner] Error spawning robots randomly: {e}")
-    
+
     def reset_to_initial_positions(self):
         """
         Resets all robots to their initial positions.
