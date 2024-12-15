@@ -146,6 +146,10 @@ class RoboticsMultiagentMappingExtension(omni.ext.IExt):
 
     def on_robot_file_selected(self, file_path, robot_index, robot_label):
         if os.path.isfile(file_path) and file_path.endswith(".usd"):
+            if file_path in self.robot_file_paths:
+                print(f"[Extension] Duplicate file selection is not allowed: {file_path}")
+                robot_label.text = "Duplicate file selected"
+                return
             file_name = os.path.basename(file_path)
             self.robot_file_paths[robot_index - 1] = file_path
             robot_label.text = file_name
