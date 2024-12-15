@@ -2,7 +2,9 @@ from pxr import Gf, UsdGeom, Usd
 import omni.usd
 from omni.isaac.core.utils.stage import add_reference_to_stage
 from omni.isaac.core.prims import XFormPrim
-import os, random
+
+import os, random, json
+
 class RobotSpawner:
     """
     Handles the logic for spawning robots in the simulation.
@@ -17,6 +19,11 @@ class RobotSpawner:
         """
         self.message_label = message_label
         self.initial_positions = {} # Dictionary to store initial robot positions
+
+        # Dynamically construct the path to the desired directory (six levels up)
+        current_dir = os.path.dirname(os.path.abspath(__file__))  # Path to spawn.py
+        parent_dir = os.path.abspath(os.path.join(current_dir, "../../../../../../"))  # Navigate 6 levels up
+        self.json_file_path = os.path.join(parent_dir, "robot_positions.json")  # Save JSON file here
 
     def spawn_robots(self, num_robots, robot_usd_path, world_prim_path):
         """
@@ -69,15 +76,22 @@ class RobotSpawner:
             for i, position in enumerate(positions):
                 robot_name = f"robot_{i+1}"
                 robot_path = f"/World/{robot_name}"
+                namespace = os.path.splitext(os.path.basename(robot_usd_path))[0]
+
                 add_reference_to_stage(robot_usd_path, robot_path)
 
                 xform_prim = stage.GetPrimAtPath(robot_path)
                 if xform_prim.IsValid():
                     xform_prim.GetAttribute("xformOp:translate").Set(position)
-                    self.initial_positions[robot_name] = position  # Save initial position
+                    self.initial_positions[robot_name] = {
+                        "namespace": namespace,
+                        "position": [position[0], position[1], position[2]],
+                    }
                     print(f"[RobotSpawner] Positioned {robot_name} at {position}.")
                 else:
                     print(f"[RobotSpawner] Failed to retrieve prim for {robot_name}.")
+            # save positions to json file
+            self.save_initial_positions_to_json()
 
             print(f"[RobotSpawner] Spawned {num_robots} robots randomly!")
         except Exception as e:
@@ -96,3 +110,14 @@ class RobotSpawner:
                 print(f"[RobotSpawner] Reset {robot_name} to initial position {position}.")
             else:
                 print(f"[RobotSpawner] Prim {robot_name} not found for reset.")
+    
+    def save_initial_positions_to_json(self):
+        """
+        Saves the initial positions of the robots to a JSON file.
+        """
+        try:
+            with open(self.json_file_path, "w") as json_file:
+                json.dump(self.initial_positions, json_file, indent=4)
+            print("[RobotSpawner] Initial positions saved to robot_positions.json.")
+        except Exception as e:
+            print(f"[RobotSpawner] Error saving initial positions to JSON: {e}")
