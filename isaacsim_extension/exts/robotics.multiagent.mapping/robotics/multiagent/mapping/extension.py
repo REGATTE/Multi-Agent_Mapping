@@ -212,6 +212,7 @@ class RoboticsMultiagentMappingExtension(omni.ext.IExt):
             self.robot_spawner = RobotSpawner(stage)
             self.robot_spawner.spawn_robots(len(valid_robot_paths), valid_robot_paths, world_prim_path)
 
+
             print(f"[Extension] Spawned {len(valid_robot_paths)} robots successfully.")
         except Exception as e:
             print(f"[Extension] Error during spawning: {e}")
