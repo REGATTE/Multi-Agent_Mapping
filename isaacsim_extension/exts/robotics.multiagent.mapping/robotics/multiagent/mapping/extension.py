@@ -197,17 +197,20 @@ class RoboticsMultiagentMappingExtension(omni.ext.IExt):
             print("[Extension] No world file selected.")
             return
 
-        valid_robot_paths = [path for path in self.robot_file_paths if path]
+        valid_robot_paths = [path for path in self.robot_file_paths if path and os.path.exists(path)]
         if not valid_robot_paths:
             print("[Extension] No robot files selected.")
             return
+    
+        print(f"[Extension] Valid robot file paths: {valid_robot_paths}")
 
         try:
             stage = omni.usd.get_context().get_stage()
             world_prim_path = "/World/Environment"
             add_reference_to_stage(self.selected_world_path, world_prim_path)
+
             self.robot_spawner = RobotSpawner(stage)
-            self.robot_spawner.spawn_robots(len(valid_robot_paths), valid_robot_paths[0], world_prim_path)
+            self.robot_spawner.spawn_robots(len(valid_robot_paths), valid_robot_paths, world_prim_path)
 
             print(f"[Extension] Spawned {len(valid_robot_paths)} robots successfully.")
         except Exception as e:
