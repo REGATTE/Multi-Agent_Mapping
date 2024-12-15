@@ -2,4 +2,8 @@
 *.pyc
 
 # Ignore Python cache directories
-__pycache__/
+**/__pycache__/
+**/__pycache__/**
+
+# Ignore initial positions json
+initial_positions.json
