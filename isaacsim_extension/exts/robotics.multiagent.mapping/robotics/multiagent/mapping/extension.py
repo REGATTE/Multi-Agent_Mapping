@@ -18,6 +18,9 @@ class RoboticsMultiagentMappingExtension(omni.ext.IExt):
         self.robot_rows = []  # List to track robot rows
         self.max_robots = 10
 
+        # Add a message label for feedback
+        self.message_label = None
+
         # Initialize the '+' button
         self.plus_button = None
 
@@ -46,6 +49,9 @@ class RoboticsMultiagentMappingExtension(omni.ext.IExt):
                     dialog_title="Select World USD File",
                     on_file_selected_callback=self.on_world_file_selected,
                 )
+
+                # Add the message label at the bottom
+                self.message_label = ui.Label("Messages will appear here.", height=20, alignment=ui.Alignment.CENTER)
 
     def setup_robot_selection(self):
         """Sets up the scrollable UI for robot selection."""
@@ -146,12 +152,21 @@ class RoboticsMultiagentMappingExtension(omni.ext.IExt):
 
     def on_robot_file_selected(self, file_path, robot_index, robot_label):
         if os.path.isfile(file_path) and file_path.endswith(".usd"):
+            if file_path in self.robot_file_paths:
+                print(f"[Extension] Duplicate file selected for Robot {robot_index}: {file_path}")
+                self.message_label.text = f"File already selected: {os.path.basename(file_path)}"
+                return  # Reject the duplicate file selection
+            
             file_name = os.path.basename(file_path)
             self.robot_file_paths[robot_index - 1] = file_path
             robot_label.text = file_name
             print(f"[Extension] Selected Robot {robot_index}: {file_path}")
+            if self.message_label:
+                self.message_label.text = f"Selected Robot {robot_index}: {file_name}."
         else:
             print(f"[Extension] Invalid file selected for Robot {robot_index}.")
+            if self.message_label:
+                self.message_label.text = "Error: Invalid file selected."
 
     def on_world_file_selected(self, file_path):
         if os.path.isfile(file_path) and file_path.endswith(".usd"):
@@ -182,17 +197,21 @@ class RoboticsMultiagentMappingExtension(omni.ext.IExt):
             print("[Extension] No world file selected.")
             return
 
-        valid_robot_paths = [path for path in self.robot_file_paths if path]
+        valid_robot_paths = [path for path in self.robot_file_paths if path and os.path.exists(path)]
         if not valid_robot_paths:
             print("[Extension] No robot files selected.")
             return
+    
+        print(f"[Extension] Valid robot file paths: {valid_robot_paths}")
 
         try:
             stage = omni.usd.get_context().get_stage()
             world_prim_path = "/World/Environment"
             add_reference_to_stage(self.selected_world_path, world_prim_path)
+
             self.robot_spawner = RobotSpawner(stage)
-            self.robot_spawner.spawn_robots(valid_robot_paths, world_prim_path)
+            self.robot_spawner.spawn_robots(len(valid_robot_paths), valid_robot_paths, world_prim_path)
+
 
             print(f"[Extension] Spawned {len(valid_robot_paths)} robots successfully.")
         except Exception as e:
