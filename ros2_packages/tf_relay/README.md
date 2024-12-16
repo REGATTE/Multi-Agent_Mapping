@@ -4,11 +4,23 @@ Package to prefix robot namespace to all transform frames. It can update the tf 
 
 ## Run
 
-To run the package,
+To run the package individually:
 
 ```bash
 ros2 run tf_relay tf_relay_main --ros-args -p robot_namespaces:="[robot_1, robot_2]"
 ```
+
+To launch the package, there are 2 options:
+
+- 1. Use the saved json file from the extension
+    ```bash
+    ros2 launch tf_relay tf_relay.launch.py mode:=json
+    ```
+
+- 2. Manually give the namesapces
+    ```bash
+    ros2 launch tf_relay tf_relay.launch.py mode:=param robot_namespaces:="[robot_1, robot_2]"
+    ```
 
 *Replace the robot_1 and robot_2 with the spawned robot namespaces*
 

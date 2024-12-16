@@ -2,7 +2,7 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>tf_relay</name>
-  <version>0.1.0</version>
+  <version>0.2.0</version>
   <description>Package to prefix namesapce to all frames.</description>
   <maintainer email="ashok.kumarj@icloud.com">regatte</maintainer>
   <license>TODO: License declaration</license>
@@ -14,6 +14,7 @@
   <depend>tf2_msgs</depend>
   <depend>geometry_msgs</depend>
   <depend>std_msgs</depend>
+  <depend>nlohmann_json</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
