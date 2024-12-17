@@ -6,19 +6,34 @@ from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 import json
 
-def parse_robot_namespaces(context):
-    # Resolve LaunchConfiguration('robot_namespaces') and parse it as a JSON array
-    raw_namespaces = LaunchConfiguration('robot_namespaces').perform(context)
+def parse_json_file(context):
+    # Load namespaces from the JSON file
+    json_file_path = "/home/regastation/workspaces/masters_ws/src/Multi-Agent_Mapping/initial_positions.json"
     try:
-        # Replace single quotes with double quotes for valid JSON parsing
-        namespaces = json.loads(raw_namespaces.replace("'", '"'))
+        with open(json_file_path, 'r') as f:
+            data = json.load(f)
+        namespaces = [robot["namespace"] for robot in data.values()]
         return namespaces
-    except json.JSONDecodeError as e:
-        raise RuntimeError(f"Failed to parse robot_namespaces: {e}")
+    except Exception as e:
+        raise RuntimeError(f"Failed to parse JSON file: {e}")
 
 def generate_nodes(context):
-    # Generate republisher nodes dynamically for all namespaces
-    namespaces = parse_robot_namespaces(context)
+    # Determine the mode and parse namespaces
+    mode = LaunchConfiguration("mode").perform(context)
+    if mode == "param":
+        # Parse namespaces from LaunchConfiguration when in param mode
+        raw_namespaces = LaunchConfiguration("robot_namespaces").perform(context)
+        try:
+            namespaces = json.loads(raw_namespaces.replace("'", '"'))
+        except json.JSONDecodeError as e:
+            raise RuntimeError(f"Failed to parse robot_namespaces: {e}")
+    elif mode == "json":
+        # Parse namespaces from JSON file when in json mode
+        namespaces = parse_json_file(context)
+    else:
+        raise RuntimeError("Invalid mode. Use 'param' or 'json'.")
+
+    # Generate republisher nodes for each namespace
     nodes = []
     for ns in namespaces:
         nodes.append(
@@ -46,8 +61,6 @@ def generate_launch_description():
         description='List of robot namespaces for the param mode'
     )
 
-    json_file_path = "/home/regastation/workspaces/masters_ws/src/Multi-Agent_Mapping/initial_positions.json"
-
     tf_relay_param_node = Node(
         package='tf_relay',
         executable='tf_relay_main',
@@ -69,13 +82,14 @@ def generate_launch_description():
         output='screen',
         parameters=[
             {'use_json': True},
-            {'json_file_path': json_file_path}
+            {'json_file_path': "/home/regastation/workspaces/masters_ws/src/Multi-Agent_Mapping/initial_positions.json"}
         ],
         condition=IfCondition(
             PythonExpression(['"', LaunchConfiguration("mode"), '" == "json"'])
         )
     )
 
+    # Dynamically generate republisher nodes
     republisher_nodes = OpaqueFunction(function=generate_nodes)
 
     return LaunchDescription([
