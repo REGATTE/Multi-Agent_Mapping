@@ -19,7 +19,7 @@ To launch the package, there are 2 options:
 
 - 2. Manually give the namesapces
     ```bash
-    ros2 launch tf_relay tf_relay.launch.py mode:=param robot_namespaces:="[robot_1, robot_2]"
+    ros2 launch tf_relay tf_relay.launch.py mode:=param robot_namespaces:="["robot_1", "robot_2"]"
     ```
 
 *Replace the robot_1 and robot_2 with the spawned robot namespaces*
