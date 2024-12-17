@@ -12,6 +12,7 @@ find_package(tf2_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(nlohmann_json REQUIRED)
+find_package(tf_republisher REQUIRED)
 
 include_directories(
   include
